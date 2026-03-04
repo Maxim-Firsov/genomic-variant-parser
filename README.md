@@ -79,7 +79,7 @@ variant_type  count
 - INFO extraction is key-based and currently focuses on a small set of tags.
 - The sample dataset is intentionally compact for portability and test speed.
 
-## How To Run
+## Running The Project
 
 ```powershell
 python -m pip install -r requirements.txt
