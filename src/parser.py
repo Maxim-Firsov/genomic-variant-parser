@@ -34,6 +34,7 @@ def open_variant_stream(input_path: Path):
 
 def classify_variant(ref: str, alt: str) -> str:
     """Classify a variant based on reference and alternate allele lengths."""
+    # This is a lightweight structural classification rather than a full normalization pass.
     if len(ref) == len(alt) == 1:
         return "SNP"
     if len(alt) > len(ref):
@@ -67,6 +68,8 @@ def parse_vcf(input_path: Path) -> pd.DataFrame:
             transcript = info_map.get("TRANSCRIPT", "NA")
 
             for alt_allele in alt.split(","):
+                # Multi-allelic rows are expanded so downstream summaries operate on
+                # one alternate allele per record instead of a mixed ALT field.
                 records.append(
                     {
                         "chromosome": chrom,
@@ -100,6 +103,8 @@ def summarize_by_gene(variants: pd.DataFrame) -> pd.DataFrame:
     if variants.empty:
         return pd.DataFrame(columns=["gene", "variant_count", "top_impact"])
 
+    # Gene-level summary keeps the count and the most severe observed impact so
+    # the output remains compact while still prioritizing potentially important calls.
     summary = (
         variants.groupby("gene", as_index=False)
         .agg(
@@ -162,6 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Parse the requested VCF, print summaries, and optionally write export artifacts."""
     args = build_parser().parse_args()
     input_path = Path(args.input)
 
