@@ -1,6 +1,6 @@
 # Genomic Variant Parser
 
-VCF parsing and summarization project for small-variant review workflows. The repository converts raw variant rows into gene-level and variant-type summaries, and it can emit stable tabular outputs for downstream inspection.
+VCF parsing and summarization tool for small-variant review workflows. The repository converts raw variant rows into gene-level and variant-type summaries, and it can emit stable tabular outputs for downstream inspection.
 
 ## Problem Statement
 
