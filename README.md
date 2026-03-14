@@ -82,7 +82,7 @@ variant_type  count
 ## Running The Project
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -e .
 python src\parser.py --input data\example.vcf --summary-json outputs\summary.json
 python -m unittest discover -s tests
 ```
