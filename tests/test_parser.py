@@ -53,6 +53,44 @@ class ParserTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 parse_vcf(invalid_path)
 
+    def test_parse_vcf_rejects_non_positive_positions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            invalid_path = Path(temp_dir) / "invalid_pos.vcf"
+            invalid_path.write_text(
+                "##fileformat=VCFv4.2\n"
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+                "1\t0\t.\tA\tT\t.\tPASS\tGENE=TP53\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "non-positive POS"):
+                parse_vcf(invalid_path)
+
+    def test_parse_vcf_rejects_missing_alternate_alleles(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            invalid_path = Path(temp_dir) / "invalid_alt.vcf"
+            invalid_path.write_text(
+                "##fileformat=VCFv4.2\n"
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+                "1\t10\t.\tA\t.\t.\tPASS\tGENE=TP53\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing alternate allele"):
+                parse_vcf(invalid_path)
+
+    def test_parse_vcf_normalizes_placeholder_filter_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "filter_placeholder.vcf"
+            input_path.write_text(
+                "##fileformat=VCFv4.2\n"
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+                "1\t10\t.\tA\tT\t.\t.\tGENE=TP53\n",
+                encoding="utf-8",
+            )
+
+            variants = parse_vcf(input_path)
+
+        self.assertEqual(variants.iloc[0]["filter"], "UNSPECIFIED")
+
     def test_write_dataframe_output_supports_csv_and_json(self) -> None:
         variants = parse_vcf(self.example_path)
         with tempfile.TemporaryDirectory() as temp_dir:

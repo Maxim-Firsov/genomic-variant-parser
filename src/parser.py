@@ -44,6 +44,37 @@ def classify_variant(ref: str, alt: str) -> str:
     return "complex"
 
 
+def normalize_filter_status(filter_value: str) -> str:
+    """Convert VCF FILTER placeholders into stable analyst-facing labels."""
+    normalized = filter_value.strip()
+    if not normalized or normalized == ".":
+        return "UNSPECIFIED"
+    return normalized
+
+
+def _parse_position(raw_position: str, line: str) -> int:
+    """Parse and validate a 1-based VCF position."""
+    try:
+        position = int(raw_position)
+    except ValueError as exc:
+        raise ValueError(f"VCF record has a non-integer POS value: {line}") from exc
+
+    if position <= 0:
+        raise ValueError(f"VCF record has a non-positive POS value: {line}")
+    return position
+
+
+def _validate_alleles(ref: str, alt: str, line: str) -> list[str]:
+    """Validate reference and alternate alleles and expand ALT values."""
+    if not ref or ref == ".":
+        raise ValueError(f"VCF record is missing a reference allele: {line}")
+
+    alternate_alleles = [allele.strip() for allele in alt.split(",")]
+    if not alternate_alleles or any(not allele or allele == "." for allele in alternate_alleles):
+        raise ValueError(f"VCF record contains a missing alternate allele: {line}")
+    return alternate_alleles
+
+
 def parse_vcf(input_path: Path) -> pd.DataFrame:
     """Read a VCF file and return parsed variant records."""
     records = []
@@ -61,26 +92,28 @@ def parse_vcf(input_path: Path) -> pd.DataFrame:
             if len(fields) < 8:
                 raise ValueError(f"VCF record has fewer than 8 columns: {line}")
 
-            chrom, pos, _, ref, alt, _, _, info = fields[:8]
+            chrom, pos, _, ref, alt, qual, filter_value, info = fields[:8]
             info_map = parse_info_field(info)
             gene = info_map.get("GENE", "UNKNOWN")
             impact = info_map.get("IMPACT", "UNSPECIFIED")
             transcript = info_map.get("TRANSCRIPT", "NA")
+            position = _parse_position(pos, line)
+            alternate_alleles = _validate_alleles(ref, alt, line)
 
-            for alt_allele in alt.split(","):
+            for alt_allele in alternate_alleles:
                 # Multi-allelic rows are expanded so downstream summaries operate on
                 # one alternate allele per record instead of a mixed ALT field.
                 records.append(
                     {
                         "chromosome": chrom,
-                        "position": int(pos),
+                        "position": position,
                         "reference_allele": ref,
                         "alternate_allele": alt_allele,
                         "gene": gene,
                         "impact": impact,
                         "transcript": transcript,
-                        "quality": fields[5],
-                        "filter": fields[6],
+                        "quality": qual,
+                        "filter": normalize_filter_status(filter_value),
                         "variant_type": classify_variant(ref, alt_allele),
                     }
                 )
