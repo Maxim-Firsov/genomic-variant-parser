@@ -9,6 +9,7 @@ from src.parser import (
     build_run_report,
     parse_vcf,
     summarize_by_gene,
+    summarize_filter_statuses,
     summarize_impacts,
     summarize_variant_types,
     write_dataframe_output,
@@ -38,6 +39,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(report["gene_count"], 4)
         self.assertEqual(report["variant_type_counts"], summarize_variant_types(variants).to_dict(orient="records"))
         self.assertEqual(report["impact_counts"], summarize_impacts(variants).to_dict(orient="records"))
+        self.assertEqual(report["filter_counts"], summarize_filter_statuses(variants).to_dict(orient="records"))
 
     def test_impact_summary_orders_by_frequency_then_severity(self) -> None:
         variants = parse_vcf(self.example_path)
@@ -107,18 +109,28 @@ class ParserTests(unittest.TestCase):
 
         self.assertEqual(variants.iloc[0]["filter"], "UNSPECIFIED")
 
+    def test_filter_summary_prefers_pass_when_counts_tie(self) -> None:
+        variants = parse_vcf(self.example_path)
+
+        summary = summarize_filter_statuses(variants)
+
+        self.assertEqual(summary.to_dict(orient="records"), [{"filter": "PASS", "count": 5}])
+
     def test_write_dataframe_output_supports_csv_and_json(self) -> None:
         variants = parse_vcf(self.example_path)
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_path = Path(temp_dir) / "variants.csv"
             json_path = Path(temp_dir) / "variants.json"
             impact_path = Path(temp_dir) / "impact_summary.json"
+            filter_path = Path(temp_dir) / "filter_summary.csv"
             write_dataframe_output(variants, csv_path)
             write_dataframe_output(variants.head(1), json_path)
             write_dataframe_output(summarize_impacts(variants), impact_path)
+            write_dataframe_output(summarize_filter_statuses(variants), filter_path)
             self.assertTrue(csv_path.exists())
             self.assertTrue(json_path.exists())
             self.assertTrue(impact_path.exists())
+            self.assertTrue(filter_path.exists())
 
 
 if __name__ == "__main__":

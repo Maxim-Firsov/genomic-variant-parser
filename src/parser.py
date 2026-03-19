@@ -177,6 +177,21 @@ def summarize_impacts(variants: pd.DataFrame) -> pd.DataFrame:
     return summary.drop(columns=["impact_rank"]).reset_index(drop=True)
 
 
+def summarize_filter_statuses(variants: pd.DataFrame) -> pd.DataFrame:
+    """Count variants by normalized FILTER status."""
+    if variants.empty:
+        return pd.DataFrame(columns=["filter", "count"])
+
+    summary = (
+        variants.groupby("filter", as_index=False)
+        .size()
+        .rename(columns={"size": "count"})
+    )
+    summary["pass_rank"] = summary["filter"].map(lambda value: 1 if str(value) == "PASS" else 0)
+    summary = summary.sort_values(["count", "pass_rank", "filter"], ascending=[False, False, True])
+    return summary.drop(columns=["pass_rank"]).reset_index(drop=True)
+
+
 def build_run_report(variants: pd.DataFrame) -> dict:
     """Generate a compact machine-readable run summary."""
     return {
@@ -184,6 +199,7 @@ def build_run_report(variants: pd.DataFrame) -> dict:
         "gene_count": int(variants["gene"].nunique()) if not variants.empty else 0,
         "variant_type_counts": summarize_variant_types(variants).to_dict(orient="records"),
         "impact_counts": summarize_impacts(variants).to_dict(orient="records"),
+        "filter_counts": summarize_filter_statuses(variants).to_dict(orient="records"),
         "top_genes": summarize_by_gene(variants).head(5).to_dict(orient="records"),
     }
 
@@ -213,6 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gene-summary-out", default=None, help="Optional path to write gene summary (.csv or .json).")
     parser.add_argument("--type-summary-out", default=None, help="Optional path to write variant-type summary (.csv or .json).")
     parser.add_argument("--impact-summary-out", default=None, help="Optional path to write impact summary (.csv or .json).")
+    parser.add_argument("--filter-summary-out", default=None, help="Optional path to write FILTER summary (.csv or .json).")
     return parser
 
 
@@ -225,6 +242,7 @@ def main() -> None:
     gene_summary = summarize_by_gene(variants)
     type_summary = summarize_variant_types(variants)
     impact_summary = summarize_impacts(variants)
+    filter_summary = summarize_filter_statuses(variants)
 
     if variants.empty:
         print("No variant records found.")
@@ -241,6 +259,9 @@ def main() -> None:
     print()
     print("Summary by impact:")
     print(impact_summary.to_string(index=False))
+    print()
+    print("Summary by FILTER status:")
+    print(filter_summary.to_string(index=False))
 
     if args.summary_json:
         summary_path = Path(args.summary_json)
@@ -268,6 +289,11 @@ def main() -> None:
         impact_summary_path = Path(args.impact_summary_out)
         write_dataframe_output(impact_summary, impact_summary_path)
         print(f"Impact summary written to: {impact_summary_path.resolve()}")
+
+    if args.filter_summary_out:
+        filter_summary_path = Path(args.filter_summary_out)
+        write_dataframe_output(filter_summary, filter_summary_path)
+        print(f"FILTER summary written to: {filter_summary_path.resolve()}")
 
 
 if __name__ == "__main__":
