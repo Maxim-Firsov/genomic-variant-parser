@@ -9,6 +9,7 @@ from src.parser import (
     build_run_report,
     parse_vcf,
     summarize_by_gene,
+    summarize_impacts,
     summarize_variant_types,
     write_dataframe_output,
 )
@@ -36,6 +37,21 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(report["variant_count"], 5)
         self.assertEqual(report["gene_count"], 4)
         self.assertEqual(report["variant_type_counts"], summarize_variant_types(variants).to_dict(orient="records"))
+        self.assertEqual(report["impact_counts"], summarize_impacts(variants).to_dict(orient="records"))
+
+    def test_impact_summary_orders_by_frequency_then_severity(self) -> None:
+        variants = parse_vcf(self.example_path)
+
+        summary = summarize_impacts(variants)
+
+        self.assertEqual(
+            summary.to_dict(orient="records"),
+            [
+                {"impact": "HIGH", "count": 2},
+                {"impact": "MODERATE", "count": 2},
+                {"impact": "LOW", "count": 1},
+            ],
+        )
 
     def test_parse_vcf_supports_gzipped_input(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -96,10 +112,13 @@ class ParserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_path = Path(temp_dir) / "variants.csv"
             json_path = Path(temp_dir) / "variants.json"
+            impact_path = Path(temp_dir) / "impact_summary.json"
             write_dataframe_output(variants, csv_path)
             write_dataframe_output(variants.head(1), json_path)
+            write_dataframe_output(summarize_impacts(variants), impact_path)
             self.assertTrue(csv_path.exists())
             self.assertTrue(json_path.exists())
+            self.assertTrue(impact_path.exists())
 
 
 if __name__ == "__main__":
