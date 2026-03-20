@@ -7,6 +7,7 @@ import gzip
 
 from src.parser import (
     build_run_report,
+    filter_variants,
     parse_vcf,
     summarize_by_gene,
     summarize_filter_statuses,
@@ -115,6 +116,22 @@ class ParserTests(unittest.TestCase):
         summary = summarize_filter_statuses(variants)
 
         self.assertEqual(summary.to_dict(orient="records"), [{"filter": "PASS", "count": 5}])
+
+    def test_filter_variants_can_restrict_output_to_pass_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "mixed_filter.vcf"
+            input_path.write_text(
+                "##fileformat=VCFv4.2\n"
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+                "1\t10\t.\tA\tT\t.\tPASS\tGENE=TP53;IMPACT=HIGH\n"
+                "1\t11\t.\tC\tG\t.\tLowQual\tGENE=BRCA1;IMPACT=LOW\n",
+                encoding="utf-8",
+            )
+
+            variants = parse_vcf(input_path)
+            filtered = filter_variants(variants, pass_only=True)
+
+        self.assertEqual(filtered["gene"].tolist(), ["TP53"])
 
     def test_write_dataframe_output_supports_csv_and_json(self) -> None:
         variants = parse_vcf(self.example_path)

@@ -192,6 +192,14 @@ def summarize_filter_statuses(variants: pd.DataFrame) -> pd.DataFrame:
     return summary.drop(columns=["pass_rank"]).reset_index(drop=True)
 
 
+def filter_variants(variants: pd.DataFrame, *, pass_only: bool = False) -> pd.DataFrame:
+    """Apply analyst-facing record filters to a normalized variant table."""
+    filtered = variants.copy()
+    if pass_only:
+        filtered = filtered.loc[filtered["filter"] == "PASS"].reset_index(drop=True)
+    return filtered
+
+
 def build_run_report(variants: pd.DataFrame) -> dict:
     """Generate a compact machine-readable run summary."""
     return {
@@ -230,6 +238,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--type-summary-out", default=None, help="Optional path to write variant-type summary (.csv or .json).")
     parser.add_argument("--impact-summary-out", default=None, help="Optional path to write impact summary (.csv or .json).")
     parser.add_argument("--filter-summary-out", default=None, help="Optional path to write FILTER summary (.csv or .json).")
+    parser.add_argument(
+        "--pass-only",
+        action="store_true",
+        help="Keep only PASS variants after parsing and before summarization/output.",
+    )
     return parser
 
 
@@ -238,7 +251,7 @@ def main() -> None:
     args = build_parser().parse_args()
     input_path = Path(args.input)
 
-    variants = parse_vcf(input_path)
+    variants = filter_variants(parse_vcf(input_path), pass_only=args.pass_only)
     gene_summary = summarize_by_gene(variants)
     type_summary = summarize_variant_types(variants)
     impact_summary = summarize_impacts(variants)
