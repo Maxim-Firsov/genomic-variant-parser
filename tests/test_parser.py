@@ -12,6 +12,7 @@ from src.parser import (
     summarize_by_gene,
     summarize_filter_statuses,
     summarize_impacts,
+    summarize_by_transcript,
     summarize_variant_types,
     write_dataframe_output,
 )
@@ -41,6 +42,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(report["variant_type_counts"], summarize_variant_types(variants).to_dict(orient="records"))
         self.assertEqual(report["impact_counts"], summarize_impacts(variants).to_dict(orient="records"))
         self.assertEqual(report["filter_counts"], summarize_filter_statuses(variants).to_dict(orient="records"))
+        self.assertEqual(report["top_transcripts"], summarize_by_transcript(variants).head(5).to_dict(orient="records"))
 
     def test_impact_summary_orders_by_frequency_then_severity(self) -> None:
         variants = parse_vcf(self.example_path)
@@ -140,14 +142,32 @@ class ParserTests(unittest.TestCase):
             json_path = Path(temp_dir) / "variants.json"
             impact_path = Path(temp_dir) / "impact_summary.json"
             filter_path = Path(temp_dir) / "filter_summary.csv"
+            transcript_path = Path(temp_dir) / "transcript_summary.json"
             write_dataframe_output(variants, csv_path)
             write_dataframe_output(variants.head(1), json_path)
             write_dataframe_output(summarize_impacts(variants), impact_path)
             write_dataframe_output(summarize_filter_statuses(variants), filter_path)
+            write_dataframe_output(summarize_by_transcript(variants), transcript_path)
             self.assertTrue(csv_path.exists())
             self.assertTrue(json_path.exists())
             self.assertTrue(impact_path.exists())
             self.assertTrue(filter_path.exists())
+            self.assertTrue(transcript_path.exists())
+
+    def test_transcript_summary_counts_variants_and_preserves_top_impact(self) -> None:
+        variants = parse_vcf(self.example_path)
+
+        summary = summarize_by_transcript(variants)
+
+        self.assertEqual(
+            summary.loc[summary["transcript"] == "NM_007294.4"].iloc[0].to_dict(),
+            {
+                "transcript": "NM_007294.4",
+                "gene": "BRCA1",
+                "variant_count": 2,
+                "top_impact": "MODERATE",
+            },
+        )
 
 
 if __name__ == "__main__":

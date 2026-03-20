@@ -177,6 +177,23 @@ def summarize_impacts(variants: pd.DataFrame) -> pd.DataFrame:
     return summary.drop(columns=["impact_rank"]).reset_index(drop=True)
 
 
+def summarize_by_transcript(variants: pd.DataFrame) -> pd.DataFrame:
+    """Count variants per transcript with the most severe observed impact."""
+    if variants.empty:
+        return pd.DataFrame(columns=["transcript", "gene", "variant_count", "top_impact"])
+
+    summary = (
+        variants.groupby(["transcript", "gene"], as_index=False)
+        .agg(
+            variant_count=("transcript", "size"),
+            top_impact=("impact", most_severe_impact),
+        )
+        .sort_values(["variant_count", "transcript", "gene"], ascending=[False, True, True])
+        .reset_index(drop=True)
+    )
+    return summary
+
+
 def summarize_filter_statuses(variants: pd.DataFrame) -> pd.DataFrame:
     """Count variants by normalized FILTER status."""
     if variants.empty:
@@ -209,6 +226,7 @@ def build_run_report(variants: pd.DataFrame) -> dict:
         "impact_counts": summarize_impacts(variants).to_dict(orient="records"),
         "filter_counts": summarize_filter_statuses(variants).to_dict(orient="records"),
         "top_genes": summarize_by_gene(variants).head(5).to_dict(orient="records"),
+        "top_transcripts": summarize_by_transcript(variants).head(5).to_dict(orient="records"),
     }
 
 
@@ -238,6 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--type-summary-out", default=None, help="Optional path to write variant-type summary (.csv or .json).")
     parser.add_argument("--impact-summary-out", default=None, help="Optional path to write impact summary (.csv or .json).")
     parser.add_argument("--filter-summary-out", default=None, help="Optional path to write FILTER summary (.csv or .json).")
+    parser.add_argument("--transcript-summary-out", default=None, help="Optional path to write transcript summary (.csv or .json).")
     parser.add_argument(
         "--pass-only",
         action="store_true",
@@ -256,6 +275,7 @@ def main() -> None:
     type_summary = summarize_variant_types(variants)
     impact_summary = summarize_impacts(variants)
     filter_summary = summarize_filter_statuses(variants)
+    transcript_summary = summarize_by_transcript(variants)
 
     if variants.empty:
         print("No variant records found.")
@@ -275,6 +295,9 @@ def main() -> None:
     print()
     print("Summary by FILTER status:")
     print(filter_summary.to_string(index=False))
+    print()
+    print("Summary by transcript:")
+    print(transcript_summary.to_string(index=False))
 
     if args.summary_json:
         summary_path = Path(args.summary_json)
@@ -307,6 +330,11 @@ def main() -> None:
         filter_summary_path = Path(args.filter_summary_out)
         write_dataframe_output(filter_summary, filter_summary_path)
         print(f"FILTER summary written to: {filter_summary_path.resolve()}")
+
+    if args.transcript_summary_out:
+        transcript_summary_path = Path(args.transcript_summary_out)
+        write_dataframe_output(transcript_summary, transcript_summary_path)
+        print(f"Transcript summary written to: {transcript_summary_path.resolve()}")
 
 
 if __name__ == "__main__":
